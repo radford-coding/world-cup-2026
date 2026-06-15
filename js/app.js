@@ -60,6 +60,14 @@ async function loadData() {
     appState.cacheAge = getCacheAgeMinutes(cached.timestamp);
     buildTeamsMap();
     switchView(appState.view);
+  } else if (CACHE_GAMES?.games?.length) {
+    appState.games = CACHE_GAMES.games;
+    appState.teams = CACHE_TEAMS?.teams || [];
+    appState.groups = CACHE_GROUPS?.groups || [];
+    appState.loading = false;
+    appState.cacheAge = getCacheAgeMinutes(CACHE_TIMESTAMP);
+    buildTeamsMap();
+    switchView(appState.view);
   } else {
     appState.loading = true;
     appState.cacheAge = null;
@@ -78,7 +86,7 @@ async function loadData() {
     switchView(appState.view);
   } catch (err) {
     console.warn('API fetch failed:', err.message);
-    if (!cached) {
+    if (!appState.games.length) {
       appState.loading = false;
       appState.error = err.message;
       showError(err.message);
