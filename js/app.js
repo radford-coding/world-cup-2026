@@ -180,6 +180,7 @@ function personLabel(personName) {
 }
 
 function parseGameDate(localDate) {
+  if (!localDate) return null;
   const parts = localDate.split(' ');
   if (parts.length < 2) return null;
   const [m, d, y] = parts[0].split('/');

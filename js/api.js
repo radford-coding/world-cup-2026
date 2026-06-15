@@ -49,7 +49,11 @@ async function fetchGames() {
     API_ESPN,
     API_IRAN
   );
-  return data.games || data.events || [];
+  if (data.events) {
+    const parsed = parseEspnData(data);
+    return parsed ? parsed.games : [];
+  }
+  return data.games || [];
 }
 
 async function fetchTeams() {
