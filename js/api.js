@@ -1,5 +1,5 @@
-const API_BASE = 'https://worldcup26.ir/get';
-const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
+const API_IRAN = 'https://worldcup26.ir/get/games';
+const API_ESPN = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
 
 const API_MIN_INTERVAL = 60000;
 let lastCallTime = 0;
@@ -46,8 +46,8 @@ async function fetchWithFallback(primaryUrl, secondaryUrl) {
 
 async function fetchGames() {
   const data = await fetchWithFallback(
-    `${API_BASE}/games`,
-    ESPN_BASE
+    API_ESPN,
+    API_IRAN
   );
   return data.games || data.events || [];
 }
