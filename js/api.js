@@ -53,13 +53,11 @@ async function fetchGames() {
 }
 
 async function fetchTeams() {
-  const data = await rateLimitedFetch(`${API_BASE}/teams`);
-  return data.teams || [];
+  return CACHE_TEAMS?.teams || [];
 }
 
 async function fetchGroups() {
-  const data = await rateLimitedFetch(`${API_BASE}/groups`);
-  return data.groups || [];
+  return CACHE_GROUPS?.groups || [];
 }
 
 async function fetchAllData() {
