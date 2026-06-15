@@ -13,9 +13,10 @@ let appState = {
     if (today > MAX_DATE) return MAX_DATE;
     return today;
   })(),
-  scheduleFilter: { type: 'person', value: 'Aaron' },
+  scheduleFilter: { type: 'team', value: 'USA' },
   loading: true,
   error: null,
+  cacheAge: null,
 };
 
 
@@ -25,42 +26,63 @@ function init() {
   loadData();
 }
 
+function buildTeamsMap() {
+  appState.teamsMap = {};
+  for (const t of appState.teams) {
+    appState.teamsMap[t.name_en] = t;
+    appState.teamsMap[t.name_en.toLowerCase()] = t;
+  }
+  for (const g of appState.games) {
+    if (g.home_team_name_en) {
+      const clean = g.home_team_name_en.trim();
+      if (!appState.teamsMap[clean]) {
+        appState.teamsMap[clean] = { name_en: clean, flag: '' };
+      }
+    }
+    if (g.away_team_name_en) {
+      const clean = g.away_team_name_en.trim();
+      if (!appState.teamsMap[clean]) {
+        appState.teamsMap[clean] = { name_en: clean, flag: '' };
+      }
+    }
+  }
+}
+
 async function loadData() {
-  appState.loading = true;
   appState.error = null;
-  showLoading();
+
+  const cached = loadPersistentCache();
+  if (cached) {
+    appState.games = cached.data.games || [];
+    appState.teams = cached.data.teams || [];
+    appState.groups = cached.data.groups || [];
+    appState.loading = false;
+    appState.cacheAge = getCacheAgeMinutes(cached.timestamp);
+    buildTeamsMap();
+    switchView(appState.view);
+  } else {
+    appState.loading = true;
+    appState.cacheAge = null;
+    showLoading();
+  }
+
   try {
     const data = await fetchAllData();
     appState.games = data.games || [];
     appState.teams = data.teams || [];
     appState.groups = data.groups || [];
-
-    appState.teamsMap = {};
-    for (const t of appState.teams) {
-      appState.teamsMap[t.name_en] = t;
-      appState.teamsMap[t.name_en.toLowerCase()] = t;
-    }
-    for (const g of appState.games) {
-      if (g.home_team_name_en) {
-        const clean = g.home_team_name_en.trim();
-        if (!appState.teamsMap[clean]) {
-          appState.teamsMap[clean] = { name_en: clean, flag: '' };
-        }
-      }
-      if (g.away_team_name_en) {
-        const clean = g.away_team_name_en.trim();
-        if (!appState.teamsMap[clean]) {
-          appState.teamsMap[clean] = { name_en: clean, flag: '' };
-        }
-      }
-    }
-
     appState.loading = false;
+    appState.cacheAge = null;
+    savePersistentCache(data);
+    buildTeamsMap();
     switchView(appState.view);
   } catch (err) {
-    appState.loading = false;
-    appState.error = err.message;
-    showError(err.message);
+    console.warn('API fetch failed:', err.message);
+    if (!cached) {
+      appState.loading = false;
+      appState.error = err.message;
+      showError(err.message);
+    }
   }
 }
 
@@ -81,11 +103,22 @@ function switchView(view) {
     case 'standings': renderStandings(container); break;
     case 'schedule': renderSchedule(container); break;
   }
+  addStaleBanner(container);
+}
+
+function addStaleBanner(container) {
+  const age = appState.cacheAge;
+  if (age === null || age === undefined) return;
+  if (container.querySelector('.stale-banner')) return;
+  const banner = document.createElement('div');
+  banner.className = 'stale-banner';
+  banner.textContent = `Showing data from ${age} min ago — Updating...`;
+  container.insertBefore(banner, container.firstChild);
 }
 
 function showLoading() {
   const container = document.getElementById('view-container');
-  if (appState.loading || appState.error) return;
+  if (!appState.loading) return;
   container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading data...</p></div>';
 }
 
@@ -129,7 +162,7 @@ function teamLabel(teamName, extra = '') {
   const teamLink = `<a href="#" class="team-link" data-team="${h(linkName)}">${flag}${h(displayName)}${extra}</a>`;
   if (person) {
     const personLink = `<a href="#" class="person-link" data-person="${h(person)}">${h(person)}</a>`;
-    return `${teamLink} <span class="person-tag">${personLink}</span>`;
+    return `<span class="team-with-person">${teamLink}<span class="person-tag">${personLink}</span></span>`;
   }
   return teamLink;
 }
@@ -622,10 +655,12 @@ function renderStandings(container) {
   hRow.innerHTML = '<th>#</th><th>Person</th><th>Teams</th><th>Pts</th><th>GD</th>';
   table.appendChild(hRow);
 
+  let rank = 0;
   for (let i = 0; i < personScores.length; i++) {
     const ps = personScores[i];
     const tr = document.createElement('tr');
-    tr.className = i < 3 ? 'top-three' : '';
+    if (i === 0 || ps.totalPts < personScores[i - 1].totalPts) rank = i + 1;
+    if (i < 3) tr.classList.add('top-three');
 
     let teamsHtml = '';
     for (const td of ps.teamDetails) {
@@ -636,7 +671,7 @@ function renderStandings(container) {
     }
 
     tr.innerHTML = `
-      <td class="pos">${i + 1}</td>
+      <td class="pos">${rank}</td>
       <td class="person-cell">${personLabel(ps.person)}</td>
       <td class="teams-cell">${teamsHtml}</td>
       <td class="pts-cell highlight">${ps.totalPts}</td>
@@ -679,6 +714,7 @@ function renderSchedule(container) {
   const typeSelect = document.getElementById('schedule-type');
   const valueSelect = document.getElementById('schedule-value');
   const content = document.getElementById('schedule-content');
+  typeSelect.value = appState.scheduleFilter.type;
 
   function populateValues() {
     const type = typeSelect.value;

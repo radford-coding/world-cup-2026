@@ -84,6 +84,33 @@ function clearCache() {
   cacheTime = 0;
 }
 
+const LS_CACHE_KEY = 'wc26_cache';
+
+function loadPersistentCache() {
+  try {
+    const raw = localStorage.getItem(LS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed.data || !parsed.timestamp) return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+function savePersistentCache(data) {
+  try {
+    localStorage.setItem(LS_CACHE_KEY, JSON.stringify({
+      timestamp: Date.now(),
+      data: { games: data.games || [], teams: data.teams || [], groups: data.groups || [] }
+    }));
+  } catch (e) {}
+}
+
+function getCacheAgeMinutes(timestamp) {
+  return Math.floor((Date.now() - timestamp) / 60000);
+}
+
 const ESPN_TEAM_MAP = {};
 
 function parseEspnData(espnJson) {
